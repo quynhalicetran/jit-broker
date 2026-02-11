@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Okta → AWS JIT Broker (Demo)</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="card">
+      <div class="title">
+        <h1>Okta → AWS JIT Broker</h1>
+        <p class="sub">Just-in-time AWS access, minted from Okta groups. No standing admin.</p>
+      </div>
+
+      <div class="actions">
+        <button id="btnLogin" class="btn primary">Sign in with Okta</button>
+        <button id="btnLogout" class="btn" disabled>Sign out</button>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Session</h2>
+        <div class="kv">
+          <div class="k">Status</div>
+          <div class="v" id="status">Signed out</div>
+
+          <div class="k">User</div>
+          <div class="v" id="user">—</div>
+
+          <div class="k">Groups</div>
+          <div class="v">
+            <div id="groups" class="chips"></div>
+          </div>
+        </div>
+
+        <details class="small">
+          <summary>Token details (debug)</summary>
+          <pre id="tokenDebug" class="code"></pre>
+        </details>
+      </div>
+
+      <div class="card">
+        <h2>Request AWS Access</h2>
+
+        <label class="label">Requested group</label>
+        <select id="requestedGroup" class="input">
+          <option value="JIT-AWS-Prod-ReadOnly">JIT-AWS-Prod-ReadOnly</option>
+          <option value="JIT-AWS-Prod-Admin">JIT-AWS-Prod-Admin</option>
+        </select>
+
+        <label class="label">Reason (required)</label>
+        <input id="reason" class="input" placeholder="e.g. investigate 5xx errors in prod" maxlength="256" />
+
+        <button id="btnRequest" class="btn primary" disabled>Request JIT Session</button>
+
+        <div class="divider"></div>
+
+        <h3>Response</h3>
+        <pre id="response" class="code muted">Sign in, then request access…</pre>
+
+        <div class="row">
+          <button id="btnCopyExports" class="btn" disabled>Copy AWS exports</button>
+          <button id="btnClear" class="btn">Clear</button>
+        </div>
+
+        <p class="hint">
+          Tip: In interviews, show “ReadOnly allowed”, “Admin denied”, then add yourself to Admin group and repeat.
+        </p>
+      </div>
+    </section>
+
+    <footer class="small muted">
+      Demo UI only. Your real control plane is IAM trust + CloudTrail tags.
+    </footer>
+  </div>
+
+  <script type="module" src="index-broker.js"></script>
+
+</body>
+</html>
