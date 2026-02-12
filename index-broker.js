@@ -1,11 +1,12 @@
 import { OktaAuth } from "https://cdn.jsdelivr.net/npm/@okta/okta-auth-js@7.8.1/+esm";
 
 const CONFIG = {
-  oktaIssuer: "https://integrator-1234567.okta.com/oauth2/default", // to be replaced with your Okta Org URL + Authorization Server
-  oktaClientId: "exampleclientid1234567890", // to be replaced with your Okta Client ID
-  redirectUri: `${window.location.origin}/callback`,
+  oktaIssuer: "https://integrator-1.okta.com/oauth2/default", //replace with okta id
+  oktaClientId: "1", //replace with okta client id
+  redirectUri: `${window.location.origin}/callback`, //switch to orginin if needed
   apiBaseUrl: "https://j6fv5stxuc.execute-api.us-east-1.amazonaws.com",
 };
+
 
 const oktaAuth = new OktaAuth({
   issuer: CONFIG.oktaIssuer,
@@ -21,6 +22,7 @@ const ui = {
   status: el("status"),
   user: el("user"),
   groups: el("groups"),
+  docId: el("docId"),
   tokenDebug: el("tokenDebug"),
   requestedGroup: el("requestedGroup"),
   reason: el("reason"),
@@ -30,6 +32,15 @@ const ui = {
   btnRequest: el("btnRequest"),
   btnCopyExports: el("btnCopyExports"),
   btnClear: el("btnClear"),
+  demoDept: el("demoDept"),
+demoScope: el("demoScope"),
+demoRequestedGroup: el("demoRequestedGroup"),
+demoDocId: el("demoDocId"),
+demoApproval: el("demoApproval"),
+demoMaterial: el("demoMaterial"),
+btnDemoEvaluate: el("btnDemoEvaluate"),
+demoResult: el("demoResult"),
+
 };
 
 const ADMIN_GROUP = "JIT-AWS-Prod-Admin";
@@ -159,7 +170,7 @@ async function handleCallbackIfNeeded() {
   try {
     await oktaAuth.handleRedirect();
   } finally {
-    window.history.replaceState({}, document.title, "/");
+    window.history.replaceState({}, document.title, "/jit-broker/index-broker.html");
   }
 }
 
@@ -169,9 +180,15 @@ async function requestJit() {
 
   const reason = ui.reason.value.trim();
   const requested_group = ui.requestedGroup.value;
+  const doc_id = ui.docId.value.trim();
 
   if (!reason) {
     setResponse("Reason is required.");
+    return;
+  }
+
+  if (requested_group === "JIT-AWS-Prod-Admin" && !doc_id) {
+    setResponse("Document/Ticket is required for Prod Admin.");
     return;
   }
 
@@ -196,14 +213,15 @@ async function requestJit() {
 
   setResponse("Requesting…");
 
-  const res = await fetch(`${CONFIG.apiBaseUrl}/assume`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ reason, requested_group }),
-  });
+const res = await fetch(`${CONFIG.apiBaseUrl}/assume`, {
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${accessToken}`,
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({ reason, requested_group, doc_id }),
+});
+
 
   const data = await res.json().catch(() => ({}));
   setResponse({ httpStatus: res.status, ...data });
@@ -227,6 +245,20 @@ ui.btnLogout.addEventListener("click", handleLogout);
 ui.btnRequest.addEventListener("click", requestJit);
 ui.btnCopyExports.addEventListener("click", copyExports);
 ui.btnClear.addEventListener("click", () => setResponse("Cleared."));
+ui.btnDemoEvaluate.addEventListener("click", () => {
+  const input = {
+    dept: ui.demoDept.value,
+    scope: ui.demoScope.value,
+    requestedGroup: ui.demoRequestedGroup.value,
+    docId: ui.demoDocId.value.trim(),
+    approvalStatus: ui.demoApproval.value,
+    materialType: ui.demoMaterial.value,
+  };
+
+  const result = demoEvaluateAccess(input);
+  renderDemoResult(result);
+});
+
 
 await handleCallbackIfNeeded();
 
@@ -234,3 +266,105 @@ oktaAuth.authStateManager.subscribe(refreshUi);
 oktaAuth.start();
 
 await refreshUi();
+
+const DEMO_POLICY = {
+  deptGroupPolicy: {
+    SRE: ["JIT-AWS-Prod-ReadOnly", "JIT-AWS-Prod-Admin"],
+    Finance: ["JIT-AWS-Prod-ReadOnly"],
+    Intern: [],
+    Unknown: ["JIT-AWS-Prod-ReadOnly"], // optional safety
+  },
+  docRequirements: {
+    "JIT-AWS-Prod-Admin": {
+      required: true,
+      patterns: [/^CHG\d{6}$/, /^INC\d{6}$/],
+    },
+  },
+};
+
+function demoEvaluateAccess(input) {
+  const {
+    dept,
+    scope, 
+    requestedGroup,
+    docId,
+    approvalStatus,
+    materialType,
+  } = input;
+
+  const reasons = [];
+  const fixes = [];
+
+  const isGlobal = scope === "global";
+  const isAdminOrAbove = scope === "admin" || scope === "global";
+
+  if (materialType === "non_confidential") {
+    reasons.push("Non-confidential material: always allowed.");
+  } else {
+    if (!isAdminOrAbove) {
+      reasons.push("Confidential material requires Admin or Global.");
+      fixes.push("Select scope = Admin/Global (or in real flow: add user to Admin/Global group).");
+      return { allowed: false, reasons, fixes };
+    }
+    reasons.push("Confidential material: allowed because scope is Admin/Global.");
+  }
+
+  if (!isGlobal) {
+    const allowedByDept = (DEMO_POLICY.deptGroupPolicy[dept] || []).includes(requestedGroup);
+    if (!allowedByDept) {
+      reasons.push(`Blocked by department policy: ${dept} cannot request ${requestedGroup}.`);
+      fixes.push("Change department or request a role allowed for this department.");
+      return { allowed: false, reasons, fixes };
+    }
+    reasons.push(`Department policy allows ${requestedGroup} for ${dept}.`);
+  } else {
+    reasons.push("Global scope: bypasses department policy.");
+  }
+
+  const rule = DEMO_POLICY.docRequirements[requestedGroup];
+  if (rule?.required) {
+    if (!docId) {
+      reasons.push(`Document required for ${requestedGroup}.`);
+      fixes.push("Provide CHG/INC (e.g. CHG123456).");
+      return { allowed: false, reasons, fixes };
+    }
+    const matches = rule.patterns.some((r) => r.test(docId));
+    if (!matches) {
+      reasons.push(`Document ID format invalid: ${docId}`);
+      fixes.push("Use CHG###### or INC######.");
+      return { allowed: false, reasons, fixes };
+    }
+    reasons.push(`Document format OK: ${docId}`);
+
+    if (approvalStatus !== "approved") {
+      reasons.push(`Document not approved: ${docId}`);
+      fixes.push("Mark as Approved (or in real flow: add APPROVED record in DynamoDB).");
+      return { allowed: false, reasons, fixes };
+    }
+    reasons.push(`Document approved: ${docId}`);
+  } else {
+    reasons.push(`No document required for ${requestedGroup}.`);
+  }
+
+  if (requestedGroup === "JIT-AWS-Prod-Admin" && !isAdminOrAbove) {
+    reasons.push("Requested Admin role requires Admin/Global scope.");
+    fixes.push("Select scope = Admin/Global.");
+    return { allowed: false, reasons, fixes };
+  }
+
+  reasons.push("All checks passed.");
+  return { allowed: true, reasons, fixes };
+}
+
+function renderDemoResult(result) {
+  ui.demoResult.textContent = JSON.stringify(
+    {
+      allowed: result.allowed,
+      reasons: result.reasons,
+      recommended_fixes: result.fixes,
+    },
+    null,
+    2
+  );
+}
+

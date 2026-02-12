@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Okta → AWS JIT Broker (Demo)</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="/jit-broker/index-broker.css" />
 </head>
 <body>
   <div class="wrap">
@@ -53,6 +53,9 @@
 
         <label class="label">Reason (required)</label>
         <input id="reason" class="input" placeholder="e.g. investigate 5xx errors in prod" maxlength="256" />
+        <label class="label">Document / Ticket (required for Admin)</label>
+        <input id="docId" class="input" placeholder="e.g. CHG123456" maxlength="32" />
+
 
         <button id="btnRequest" class="btn primary" disabled>Request JIT Session</button>
 
@@ -65,17 +68,62 @@
           <button id="btnCopyExports" class="btn" disabled>Copy AWS exports</button>
           <button id="btnClear" class="btn">Clear</button>
         </div>
-
-        <p class="hint">
-          Tip: In interviews, show “ReadOnly allowed”, “Admin denied”, then add yourself to Admin group and repeat.
-        </p>
       </div>
-    </section>
+      <div class="card">
+  <h2>Demo Mode without Okta</h2>
+  <p class="sub small">Simulate policy decisions without logging in.</p>
 
-    <footer class="small muted">
-      Demo UI only. Your real control plane is IAM trust + CloudTrail tags.
-    </footer>
+  <label class="label">Department</label>
+  <select id="demoDept" class="input">
+    <option value="SRE">SRE</option>
+    <option value="Finance">Finance</option>
+    <option value="Intern">Intern</option>
+    <option value="Unknown">Unknown</option>
+  </select>
+
+  <label class="label">User scope</label>
+  <select id="demoScope" class="input">
+    <option value="regular">Regular</option>
+    <option value="admin">Admin</option>
+    <option value="global">Global</option>
+  </select>
+
+  <label class="label">Requested AWS role</label>
+  <select id="demoRequestedGroup" class="input">
+    <option value="JIT-AWS-Prod-ReadOnly">JIT-AWS-Prod-ReadOnly</option>
+    <option value="JIT-AWS-Prod-Admin">JIT-AWS-Prod-Admin</option>
+  </select>
+
+  <label class="label">Change request (CHG/INC)</label>
+  <input id="demoDocId" class="input" placeholder="e.g. CHG123456" maxlength="32" />
+
+  <label class="label">CHG Approval status</label>
+  <select id="demoApproval" class="input">
+    <option value="approved">Approved</option>
+    <option value="not_approved">Not approved</option>
+  </select>
+
+  <div class="divider"></div>
+
+  <label class="label">Requested material type</label>
+  <select id="demoMaterial" class="input">
+    <option value="non_confidential">Non-confidential (always allowed)</option>
+    <option value="confidential">Confidential (requires Global or Admin+)</option>
+  </select>
+
+  <button id="btnDemoEvaluate" class="btn primary">Evaluate Access</button>
+
+  <div class="divider"></div>
+
+  <h3>Demo Result</h3>
+  <pre id="demoResult" class="code muted">Pick inputs, then click Evaluate…</pre>
+</div>
+    </section>
+    
   </div>
+
+  
+
 
   <script type="module" src="index-broker.js"></script>
 
